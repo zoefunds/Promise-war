@@ -1,0 +1,17 @@
+{
+  "name": "promise-war",
+  "private": true,
+  "version": "0.1.0",
+  "description": "PROMISE WAR — Two sides. One claim. Bring proof. An onchain evidence-battle arena adjudicated by GenLayer Intelligent Contracts.",
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev:web": "pnpm --filter @promise-war/web dev",
+    "dev:api": "pnpm --filter @promise-war/api dev",
+    "build": "pnpm --filter @promise-war/web --filter @promise-war/api -r build",
+    "lint": "eslint \"apps/**/*.{ts,tsx}\"",
+    "test": "pnpm -r test"
+  }
+}

@@ -1,0 +1,78 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  contract:
+    name: Contract (syntax, lint, static tests)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Syntax check
+        run: python3 -m py_compile contracts/promise_war_contract.py
+      - name: Install test dependencies
+        # genvm-linter (the `genvm-lint` CLI) IS a real pip package — no
+        # separate CLI/devtools install needed, contrary to what an earlier
+        # version of this workflow assumed. Pinned to the version verified
+        # locally (`genvm-lint check contracts/promise_war_contract.py
+        # --json` returns 0 errors) so a future genvm-linter release can't
+        # silently change lint behavior underneath CI.
+        run: pip install pytest "genvm-linter==0.11.0"
+      - name: Static safety tests
+        run: python3 -m pytest contracts/test/ -v
+      - name: GenVM lint (required — fails the build on any lint error)
+        run: genvm-lint check contracts/promise_war_contract.py
+
+  web:
+    name: Frontend (typecheck, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm build
+        env:
+          NEXT_PUBLIC_CONTRACT_ADDRESS: "0x0000000000000000000000000000000000dEaD"
+          NEXT_PUBLIC_STUDIONET_CHAIN_ID: "61999"
+          NEXT_PUBLIC_STUDIONET_RPC_URL: "https://studio.genlayer.com/api"
+          NEXT_PUBLIC_API_BASE_URL: "http://localhost:4000"
+
+  api:
+    name: Backend (typecheck, build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+        working-directory: .
+      - run: pnpm exec prisma generate --schema ../../database/schema.prisma
+      - run: pnpm exec tsc --noEmit
+      - run: pnpm exec tsc -p tsconfig.json --noEmit --outDir /tmp/ci-build-check

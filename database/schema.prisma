@@ -1,0 +1,142 @@
+// PROMISE WAR — off-chain cache schema. This database NEVER stores a
+// balance, stake, or verdict the deployed Intelligent Contract doesn't also
+// track — it exists purely to make claim/evidence discovery, search, and
+// notifications fast. The contract remains the sole source of truth for
+// money and verdicts; every row here is refreshed from a contract read by
+// apps/api/src/sync/poller.ts and is safe to fully wipe and re-sync at any
+// time without losing anything economically meaningful.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  walletAddress String    @unique
+  createdAt     DateTime  @default(now())
+  lastSeenAt    DateTime  @default(now())
+
+  notifications Notification[]
+
+  @@map("users")
+}
+
+// Short-lived SIWE-style nonce, one per wallet address, consumed on
+// successful signature verification (auth/siwe.ts deletes it after use so a
+// captured nonce+signature pair can never be replayed).
+model AuthNonce {
+  id            String   @id @default(cuid())
+  walletAddress String   @unique
+  nonce         String
+  expiresAt     DateTime
+
+  @@map("auth_nonces")
+}
+
+model Claim {
+  id                       Int      @id
+  creator                  String
+  statement                String
+  description              String
+  resolutionCriteria       String
+  category                 String
+  createdTs                Int
+  participationDeadlineTs  Int
+  evidenceDeadlineTs       Int
+  status                   String
+  minSideStakeWei          String
+  minEvidenceStakeWei      String
+  supportStakeWei          String
+  challengeStakeWei        String
+  totalStakeWei            String
+  evidenceCount            Int
+  supportEvidenceCount     Int
+  challengeEvidenceCount   Int
+  neutralEvidenceCount     Int
+  verdict                  String
+  reasoningSummary         String
+  reviewAttempts           Int
+  adjudicatedAt            Int
+  settledAt                Int
+  sidePayoutsSettled       Boolean  @default(false)
+  evidencePayoutsSettled   Boolean  @default(false)
+  evidenceSlashPoolWei     String   @default("0")
+  protocolFeeBpsSnapshot         Int @default(200)
+  slashTreasuryShareBpsSnapshot  Int @default(1500)
+  slashPoolShareBpsSnapshot      Int @default(8500)
+  lastSyncedAt             DateTime @updatedAt
+
+  evidence      Evidence[]
+  activity      ActivityEvent[]
+  notifications Notification[]
+
+  @@index([status])
+  @@index([category])
+  @@map("claims")
+}
+
+model Evidence {
+  id                     Int      @id
+  claimId                Int
+  side                   String
+  submitter              String
+  sourceUrl              String
+  sourceTitle            String
+  publisher              String
+  publicationDate        String
+  retrievalDate          String
+  summary                String
+  sourceType             String
+  stakeWei               String
+  submittedAt            Int
+  adjudicated            Boolean
+  outcome                String
+  reasoningSummary       String
+  slashBps               Int
+  rewardEligible         Boolean
+  flagged                Boolean
+  superseded             Boolean
+  lastSyncedAt           DateTime @updatedAt
+
+  claim Claim @relation(fields: [claimId], references: [id])
+
+  @@index([claimId])
+  @@index([submitter])
+  @@map("evidence")
+}
+
+model ActivityEvent {
+  id        String   @id @default(cuid())
+  claimId   Int
+  kind      String
+  actor     String
+  amountWei String
+  ts        Int
+  note      String
+
+  claim Claim @relation(fields: [claimId], references: [id])
+
+  @@index([claimId, ts])
+  @@map("activity_events")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  claimId   Int?
+  kind      String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  claim Claim? @relation(fields: [claimId], references: [id])
+
+  @@index([userId, read])
+  @@map("notifications")
+}
