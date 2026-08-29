@@ -20,7 +20,7 @@ a real claim.
 |---|---|
 | Frontend | [promise-war.vercel.app](https://promise-war.vercel.app) |
 | Backend API | [promise-war-api.fly.dev](https://promise-war-api.fly.dev) (`/api/v1/health`) |
-| Intelligent Contract | `0x6C4c2883A2f095d659F718173b7b9d10457Aaa07` (GenLayer StudioNet) |
+| Intelligent Contract | `0x49e8B5E7A64F62623e2364Af491228820147fd25` (GenLayer StudioNet) |
 | Postgres | Fly Postgres, `promise-war-db` |
 
 The contract address above is the **current** deployment — it has been redeployed several
@@ -120,6 +120,13 @@ test campaign logs (transaction-by-transaction).
 Current source score: verified by the round-4 auditor at up to **3,920/4,000**, contingent
 on the live deployment matching source exactly (confirmed — see the live verification log
 in `MEMORY.md`).
+
+**Live verification on the current deployment**: the contract above was redeployed after
+round 4's fix, the Postgres cache was cleared, and 4 real product-test scenarios plus one
+supplementary settlement run were executed directly against it — every non-admin read and
+write method exercised with real, detailed content, zero unexpected reverts across ~35
+transactions, one full `FULFILLED` settlement chain completed end to end. Full
+transaction-by-transaction log in `MEMORY.md`.
 
 **Open, not yet closed** (documented, not silently dropped):
 - DNS-rebinding / redirect-following SSRF on evidence fetch — genuinely lives inside

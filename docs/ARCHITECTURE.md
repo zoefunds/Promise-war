@@ -102,8 +102,11 @@ sync/poller.ts          the background job described above — includes a Postgr
 Every page from the original design brief is built as a real Next.js App Router route:
 landing (`/`), claim discovery (`/arena`), claim detail (`/claims/[id]`), evidence
 submission (`/claims/[id]/submit-evidence`), claim creation (`/claims/new`), a global
-evidence feed (`/vault`), per-wallet claim history (`/staked`), the permissionless
-adjudication trigger (`/adjudication`), profile + notifications (`/profile`), an
+evidence feed (`/vault`), per-wallet claim history (`/staked`), a permissionless
+adjudication-trigger hub listing every eligible claim (`/adjudication`) — the same trigger
+also appears directly on each individual claim's own page once its evidence deadline has
+passed, so a viewer doesn't need to already know the hub page exists — profile +
+notifications (`/profile`), an
 owner-only admin panel (`/admin`, not linked from the main nav — access is enforced by the
 contract, not by hiding the link), and static content pages (`/intel`, `/laws`,
 `/privacy`).
