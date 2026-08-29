@@ -8,6 +8,7 @@ import { weiToGen, shortAddress, isPast } from "@/lib/format";
 import { JoinSideButton } from "@/components/JoinSideButton";
 import { SettlementPanel } from "@/components/SettlementPanel";
 import { EvidencePayoutButton } from "@/components/EvidencePayoutButton";
+import { RequestAdjudicationButton } from "@/components/RequestAdjudicationButton";
 import Link from "next/link";
 
 export default async function ClaimDetailPage({ params }: { params: { id: string } }) {
@@ -44,6 +45,17 @@ export default async function ClaimDetailPage({ params }: { params: { id: string
                 const evidenceOpen =
                   ["ACTIVE", "EVIDENCE_MATURING"].includes(claim.status) && !isPast(claim.evidence_deadline_ts);
                 const isRefundable = claim.status === "CANCELLED" || claim.status === "EXPIRED_TIMEOUT" || claim.verdict === "CLAIM_INVALID";
+                // Mirrors request_adjudication()'s own eligibility check
+                // exactly (contracts/promise_war_contract.py) and the
+                // /adjudication hub page's filter: permissionless, callable
+                // by ANY address (not just the creator) once the evidence
+                // deadline has passed. This button used to exist only on
+                // the separate /adjudication page — a real UX gap, since a
+                // viewer landing directly on a specific claim had no way to
+                // trigger it without knowing that other page existed.
+                const adjudicationEligible =
+                  ["ACTIVE", "EVIDENCE_MATURING", "NOT_YET_VERIFIABLE"].includes(claim.status) &&
+                  isPast(claim.evidence_deadline_ts);
                 return (
                   <>
                     <section className="glass-panel p-6 rounded-lg border-t-2 border-t-primary flex flex-col md:flex-row justify-between items-start md:items-center gap-6 relative overflow-hidden">
@@ -179,6 +191,16 @@ export default async function ClaimDetailPage({ params }: { params: { id: string
                           <div className="p-4 font-mono text-xs text-on-surface leading-relaxed">
                             {claim.reasoning_summary || "No adjudication has run yet for this claim."}
                           </div>
+                          {adjudicationEligible && (
+                            <div className="p-4 border-t border-outline-variant/20 flex flex-col gap-2">
+                              <p className="font-mono text-[10px] text-on-surface-variant">
+                                The evidence deadline has passed — anyone can trigger adjudication now (no
+                                stake or GEN required, just gas). This is not limited to the claim's
+                                creator.
+                              </p>
+                              <RequestAdjudicationButton claimId={claim.id} />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </section>
