@@ -914,6 +914,69 @@ session hasn't undertaken):
 - Redirect/DNS-rebinding fetch risk — still an acknowledged,
   layer-inappropriate limitation, unchanged from prior rounds.
 
+## Fifth contract redeployment + 4-product live verification (2026-08-29)
+
+New deployed address: **`0x49e8B5E7A64F62623e2364Af491228820147fd25`** (schema verified,
+45 methods, exact source match). Wired into Vercel, Fly, and `.env.local`/`.env.example`;
+Postgres cache fully truncated first (claims/evidence/activity/notifications all
+confirmed at 0 rows before any test transaction).
+
+User asked for exactly 4 product tests covering every non-admin read/write method, with
+real detailed content (no placeholders), and zero errors visible on the block explorer —
+meaning, unlike prior audit rounds, this campaign was NOT allowed to include any
+deliberately-reverting adversarial calls. Designed 4 scenarios plus one supplementary run
+(needed because the first three all independently landed on the safe `NOT_YET_VERIFIABLE`
+outcome, which is a valid successful transaction, not a revert, but meant
+`settle_claim_sides`/`settle_claim_evidence`/`claim_side_payout`/`claim_evidence_payout`
+hadn't been exercised yet):
+
+1. **Product 1** — full single-account lifecycle, a real claim about GenLayer's
+   LLM-in-consensus design, backed by GenLayer's own "how it works" docs page. Verdict:
+   `NOT_YET_VERIFIABLE`.
+2. **Product 2** — cross-address SUPPORT vs CHALLENGE, two funded accounts, a claim about
+   `get_platform_stats()`'s own reporting behavior. Verdict: `NOT_YET_VERIFIABLE`.
+   `request_adjudication` triggered by the non-creator account (permissionless check).
+3. **Product 3** — exercised `supersede_evidence` (retracted an initial, weaker source
+   before adjudication) and `advance_to_evidence_maturing` (permissionless status
+   transition once the participation window closes but evidence stays open), on a claim
+   about StudioNet's own operating status. Verdict: `NOT_YET_VERIFIABLE`.
+4. **Product 4** — `cancel_claim` + `claim_side_refund` + `claim_evidence_refund`: the
+   creator staked, submitted their own evidence (submitting your own evidence doesn't set
+   `third_party_joined`, so it doesn't block cancellation), cancelled, and reclaimed both
+   the side stake and the evidence stake via the dedicated refund paths.
+5. **Supplementary** — reused the exact claim framing that has reliably reached a
+   decisive verdict in every prior round ("GenLayer publishes official developer
+   documentation at docs.genlayer.com" backed by the docs.genlayer.com homepage itself).
+   Verdict: `FULFILLED`. Ran the full remaining settlement chain:
+   `settle_claim_evidence` → `settle_claim_sides` → `claim_side_payout` →
+   `claim_evidence_payout` → `withdraw`. Reputation confirmed updated correctly
+   (`wins:1, evidence_rewards:1, score:23`).
+
+**Every non-admin write method exercised, all `execution_result: SUCCESS`, zero
+unexpected reverts across ~35 transactions**: `create_claim`, `join_side`,
+`submit_evidence`, `supersede_evidence`, `advance_to_evidence_maturing`,
+`request_adjudication`, `settle_claim_sides`, `settle_claim_evidence`, `claim_side_payout`,
+`claim_evidence_payout`, `cancel_claim`, `claim_side_refund`, `claim_evidence_refund`,
+`withdraw`. Every non-admin view exercised too: `get_version`, `get_categories`,
+`is_paused`, `get_claim_count`, `get_evidence_count_total`, `get_claim`,
+`get_claims_page`, `get_evidence`, `get_claim_evidence`, `get_side_stake`,
+`get_withdrawable_balance`, `get_reputation`, `get_activity`, `get_platform_stats`.
+
+The test script (`/tmp/gltest/final-4-products.mjs`, scratch/ephemeral, not part of the
+repo) was deliberately written to throw immediately on any unexpected revert rather than
+retry past one — this is what "zero errors" was verified against, not just eyeballing
+logs after the fact.
+
+**Not exercised, by necessity**: `claim_adjudication_timeout()` requires a real 7-day wait
+past the evidence deadline — not achievable live in a single session. Coverage for it
+remains the static test suite only (`contracts/test/`). Admin/owner methods were
+excluded per the user's explicit instruction.
+
+All 5 claims (ids 0–4) confirmed rendering live on the frontend
+(`promise-war.vercel.app/arena`, `/claims/3`, `/claims/4`) — the claim-detail page's
+direct-chain fallback meant this was true even before the Postgres cache's poll interval
+caught up on the newest two.
+
 ## Known user feedback / preferences
 
 - User wants a genuinely production-scale contract (1000+ lines) that is not
