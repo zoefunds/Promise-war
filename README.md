@@ -19,15 +19,12 @@ a real claim.
 | Component | URL / Address |
 |---|---|
 | Frontend | [promise-war.vercel.app](https://promise-war.vercel.app) |
-| Backend API | [promise-war-api.fly.dev](https://promise-war-api.fly.dev) (`/api/v1/health`) |
-| Intelligent Contract | `0x49e8B5E7A64F62623e2364Af491228820147fd25` (GenLayer StudioNet) |
-| Postgres | Fly Postgres, `promise-war-db` |
+| Backend API | [promise-war-api-george.fly.dev](https://promise-war-api-george.fly.dev) (`/api/v1/health`) |
+| Intelligent Contract | `0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902` (GenLayer StudioNet) |
+| Postgres | Fly Postgres, `promise-war-db-george` |
 
-The contract address above is the **current** deployment — it has been redeployed several
-times as audit fixes landed (see [Audit & fix history](#audit--fix-history) below and
-`MEMORY.md` for the full blow-by-blow). Contracts are immutable, so a fix only takes effect
-on a fresh deployment with a new address; whichever address is live is always the one wired
-into the frontend/backend env vars documented here.
+The contract address above is the current deployment. Contracts are immutable, so fixes take
+effect through a fresh deployment; the frontend and backend are both wired to this address.
 
 ## What makes this a real GenLayer application, not an AI wrapper
 
@@ -97,7 +94,7 @@ python3 -m pytest contracts/test/ -v
 genvm-lint check contracts/promise_war_contract.py
 ```
 
-23 tests: AST-based static regression tests (contract source can't be `import`ed and
+25 tests: AST-based static regression tests (contract source can't be `import`ed and
 executed outside GenVM, so these parse and assert on the AST directly — see
 `contracts/test/test_promise_war_static.py`'s module docstring) plus 500-trial-each
 randomized property tests for payout conservation, claimant-ordering independence, and
@@ -105,10 +102,9 @@ slash conservation (`contracts/test/test_settlement_math_properties.py`).
 
 ## Audit & fix history
 
-This contract went through four rounds of adversarial third-party audit during
-development. Every finding below was verified fixed against a live redeployment with real
-multi-account transactions, not just at the source level — see `MEMORY.md` for the full
-test campaign logs (transaction-by-transaction).
+This contract went through four rounds of adversarial review during development. The current
+deployment includes the fixes listed below and is backed by local regression tests plus live
+StudioNet verification.
 
 | Round | Score | Key finding(s) fixed |
 |---|---|---|
@@ -117,16 +113,14 @@ test campaign logs (transaction-by-transaction).
 | 3 | 3,760 → fixed | Owner controls had no delay/notice mechanism before taking effect |
 | 4 | 3,920 → fixed | A claim's settlement read the *live* global fee/slash-share config instead of what was in effect when the claim was created — an owner could apply a fee increase retroactively to already-staked claims |
 
-Current source score: verified by the round-4 auditor at up to **3,920/4,000**, contingent
-on the live deployment matching source exactly (confirmed — see the live verification log
-in `MEMORY.md`).
+The current deployed source was fetched from StudioNet and checked for the settlement and
+verdict safeguards described in [`review.md`](review.md).
 
 **Live verification on the current deployment**: the contract above was redeployed after
-round 4's fix, the Postgres cache was cleared, and 4 real product-test scenarios plus one
-supplementary settlement run were executed directly against it — every non-admin read and
-write method exercised with real, detailed content, zero unexpected reverts across ~35
-transactions, one full `FULFILLED` settlement chain completed end to end. Full
-transaction-by-transaction log in `MEMORY.md`.
+the latest fixes, the Postgres cache was cleared, and three real StudioNet E2E scenarios were
+run with detailed claim, stake, evidence, supersession, adjudication, cancellation, refund,
+and withdrawal data. The adjudication scenario returned `NOT_YET_VERIFIABLE` for irrelevant
+evidence, so no unsafe settlement was forced.
 
 **Open, not yet closed** (documented, not silently dropped):
 - DNS-rebinding / redirect-following SSRF on evidence fetch — genuinely lives inside
@@ -134,10 +128,9 @@ transaction-by-transaction log in `MEMORY.md`.
   intercept. HTTPS-only + a literal loopback/private-range/cloud-metadata blocklist is
   enforced (`_normalize_url()`); this is documented as a deliberately partial defense.
 - CI-gated StudioNet/localnet lifecycle tests — the current suite is static + property
-  tests; real-transaction coverage instead comes from the manual live test campaigns
-  logged in `MEMORY.md`. Building genuine CI-gated integration tests needs either a funded
-  test-wallet secret in CI or a localnet GenVM node in the runner — real new
-  infrastructure, not yet built.
+  tests; live transaction coverage is manual and documented in `review.md`. Building
+  genuine CI-gated integration tests needs either a funded test-wallet secret in CI or a
+  localnet GenVM node in the runner.
 - Owner is a single EOA behind a 48-hour timelock (`ADMIN_TIMELOCK_DELAY_SECONDS`), not yet
   an N-of-M multisig — deferred pending the owner naming signer addresses and a threshold.
 

@@ -13,7 +13,7 @@ python3 -m pytest contracts/test/ -v
 genvm-lint check contracts/promise_war_contract.py
 ```
 
-- **`test_promise_war_static.py`** (16 tests) — parses the contract's AST and asserts on
+- **`test_promise_war_static.py`** (18 tests) — parses the contract's AST and asserts on
   structure directly: exactly one contract class, every public method's parameter/return
   types are schema-safe primitives (`str`/`bool`/`int`/`None`/`u256` — never a dataclass,
   dict, or list), every `TreeMap`/`DynArray`-typed storage field is left to GenVM's own
@@ -23,7 +23,8 @@ genvm-lint check contracts/promise_war_contract.py
   (dust accounting present, slash pool no longer double-credited to treasury,
   `NOT_YET_VERIFIABLE` reopening, HTTPS/host blocklist, cancel_claim's third-party guard,
   the terminal-verdict gate on `settle_claim_evidence`, the timelock's presence + replay
-  protection, and the economic-snapshot fields).
+  protection, the economic-snapshot fields, the zero-staker recipient invariant, and the
+  validator-agreed substantive-summary requirement).
 - **`test_settlement_math_properties.py`** (7 tests) — a faithful pure-Python mirror of
   the two settlement algorithms (`claim_side_payout`'s dust-absorption loop,
   `settle_claim_evidence`'s aggregate slash split), property-tested against 500 randomized
@@ -78,8 +79,10 @@ tests have covered:
   `slash_pool_share_bps_snapshot` were read back directly and confirmed to match the
   global config at creation time.
 
-None of these tests produced a GenVM crash or an `UNDETERMINED` consensus result at any
-point across four audit rounds — every revert observed was a clean, deterministic
+The current focused run is `25 passed`. The live adjudication run returned
+`NOT_YET_VERIFIABLE` for two irrelevant sources, demonstrating that weak evidence does not
+force a decisive settlement. The live cancellation/refund and evidence-supersession runs
+also completed with finalized transactions. Every observed revert was a clean, deterministic
 `[EXPECTED]` `UserError`.
 
 **Not yet built**: automating the above as a CI-gated suite. This needs either a funded

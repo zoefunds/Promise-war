@@ -666,7 +666,10 @@ class PromiseWar(gl.Contract):
                 stake, enforced in addition to each claim's own minimum.
         """
         self.owner = gl.message.sender_address
-        self.treasury_address = Address(treasury_address)
+        # GenLayer decodes an `address` constructor argument as an Address
+        # object before invoking Python. Re-wrapping it with Address(...) is
+        # rejected by the StudioNet runtime.
+        self.treasury_address = treasury_address
         self.paused = False
         self.protocol_fee_bps = u32(DEFAULT_PROTOCOL_FEE_BPS)
         self.slash_treasury_share_bps = u32(DEFAULT_SLASH_TREASURY_SHARE_BPS)
@@ -1141,6 +1144,16 @@ Respond with ONLY a JSON object, no markdown:
   "reasoning_summary": one paragraph (under 150 words) grounded in the adjudicated evidence above
 }}"""
 
+    def _summary_substance_agrees(self, leader_summary: str, validator_summary: str) -> bool:
+        """Require independently produced reasoning to overlap materially."""
+        leader_words = set(re.findall(r"[a-z0-9]{4,}", leader_summary.lower()))
+        validator_words = set(re.findall(r"[a-z0-9]{4,}", validator_summary.lower()))
+        if len(leader_summary.strip()) < 40 or len(validator_summary.strip()) < 40:
+            return False
+        if not leader_words or not validator_words:
+            return False
+        return len(leader_words & validator_words) * 2 >= min(len(leader_words), len(validator_words))
+
     def _claim_verdicts_agree(self, leader_data: dict, validator_data: dict) -> bool:
         """The decisive economic field is which side of DECISIVE_VERDICTS /
         SUPPORT_WINNING_VERDICTS / nonterminal / invalid bucket the verdict
@@ -1153,6 +1166,14 @@ Respond with ONLY a JSON object, no markdown:
         NOT_FULFILLED, or decisive vs NOT_YET_VERIFIABLE — still fails."""
         leader = leader_data["verdict"]
         validator = validator_data["verdict"]
+        # A leader-authored verdict and summary cannot settle by themselves.
+        # The validator must independently produce substantively agreeing
+        # reasoning from the adjudicated evidence.
+        if not self._summary_substance_agrees(
+            str(leader_data.get("reasoning_summary", "")),
+            str(validator_data.get("reasoning_summary", "")),
+        ):
+            return False
         if leader == validator:
             return True
 
@@ -1532,6 +1553,13 @@ Respond with ONLY a JSON object, no markdown:
         # CLAIM_INVALID / anything else defensive: full refund, no winner.
         return -1, -1
 
+    def _winning_side(self, verdict: str) -> str | None:
+        if verdict in SUPPORT_WINNING_VERDICTS:
+            return SIDE_SUPPORT
+        if verdict == VERDICT_NOT_FULFILLED:
+            return SIDE_CHALLENGE
+        return None
+
     @gl.public.write
     def settle_claim_sides(self, claim_id: int) -> None:
         """Settle SUPPORT/CHALLENGE side stakes according to the stored
@@ -1563,6 +1591,12 @@ Respond with ONLY a JSON object, no markdown:
         _require(verdict in DECISIVE_VERDICTS, "claim verdict is not decisive — cannot settle sides")
 
         support_bps, challenge_bps = self._settlement_shares(verdict)
+        winning_side = self._winning_side(verdict)
+        winning_total = support_total if winning_side == SIDE_SUPPORT else challenge_total
+        # Never leave a decisive allocation assigned to an empty side. Route
+        # the pool to the only eligible side and waive the fee as recovery.
+        if winning_side is not None and winning_total == 0:
+            support_bps, challenge_bps = (BPS_DENOMINATOR, 0) if support_total > 0 else (0, BPS_DENOMINATOR)
         claim.side_payouts_settled = True
         claim.status = u8(STATUS_SETTLED)
         claim.settled_at = u64(now_ts)
@@ -1578,6 +1612,8 @@ Respond with ONLY a JSON object, no markdown:
                 if verdict != VERDICT_CLAIM_INVALID
                 else 0
             )
+            if winning_side is not None and winning_total == 0:
+                fee = 0
             self.accrued_treasury_wei = u256(int(self.accrued_treasury_wei) + fee)
             distributable = combined - fee
             support_amount = (distributable * support_bps) // BPS_DENOMINATOR
@@ -1655,23 +1691,22 @@ Respond with ONLY a JSON object, no markdown:
                 "evidence must be settled before side payouts on a decisive verdict",
             )
             support_bps, challenge_bps = self._settlement_shares(verdict)
+            winning_side = self._winning_side(verdict)
+            winning_total = support_total if winning_side == SIDE_SUPPORT else challenge_total
+            if winning_side is not None and winning_total == 0:
+                support_bps, challenge_bps = (BPS_DENOMINATOR, 0) if support_total > 0 else (0, BPS_DENOMINATOR)
             # Must match settle_claim_sides()'s own fee calculation exactly
             # (same claim, same snapshot) — recomputed here rather than
             # stored, since storing a derived `distributable` would be one
             # more field to keep in sync instead of one source of truth.
             fee = (combined * int(claim.protocol_fee_bps_snapshot)) // BPS_DENOMINATOR
+            if winning_side is not None and winning_total == 0:
+                fee = 0
             distributable = combined - fee
             pool_bps = support_bps if side_norm == SIDE_SUPPORT else challenge_bps
             side_total = support_total if side_norm == SIDE_SUPPORT else challenge_total
             pool_amount = (distributable * pool_bps) // BPS_DENOMINATOR
 
-            winning_side = (
-                SIDE_SUPPORT
-                if verdict in SUPPORT_WINNING_VERDICTS
-                else SIDE_CHALLENGE
-                if verdict == VERDICT_NOT_FULFILLED
-                else None
-            )
             if side_norm == winning_side:
                 pool_amount += int(claim.evidence_slash_pool_wei)
 
@@ -1784,6 +1819,19 @@ Respond with ONLY a JSON object, no markdown:
             # now rejected before reaching this point.
             if total_treasury > 0:
                 self.accrued_treasury_wei = u256(int(self.accrued_treasury_wei) + total_treasury)
+            winning_side = self._winning_side(claim.verdict)
+            winning_total = (
+                int(claim.support_stake_wei)
+                if winning_side == SIDE_SUPPORT
+                else int(claim.challenge_stake_wei)
+            )
+            # Evidence bonus has one explicit recipient invariant: if no
+            # staker exists on the winning side, recover the slash pool to
+            # treasury instead of creating an unclaimable bonus.
+            if winning_side is None or winning_total == 0:
+                if total_pool > 0:
+                    self.accrued_treasury_wei = u256(int(self.accrued_treasury_wei) + total_pool)
+                total_pool = 0
             if total_pool > 0:
                 claim.evidence_slash_pool_wei = u256(total_pool)
 

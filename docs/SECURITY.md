@@ -52,7 +52,7 @@ instead of reaching Prisma raw or falling through to a generic `500`.
   unilateral action, but the queue/execute calls themselves are still gated by one private
   key. Moving to an N-of-M multisig as the timelock's own controlling address is the
   planned next step, pending the owner naming signer addresses and a threshold.
-- **No CI-gated live-contract integration tests.** The 23 tests in `contracts/test/` are
+- **No CI-gated live-contract integration tests.** The 25 tests in `contracts/test/` are
   static (AST-based) and property-based (pure-Python mirrors of the settlement math,
   randomized). Real-transaction coverage exists — extensively, across four audit rounds,
   with real multi-account settlements — but as manually-run test campaigns logged in

@@ -116,6 +116,34 @@ def test_claim_side_payout_has_dust_accounting_and_winning_side_bonus():
     assert "evidence_slash_pool_wei" in src, "winning-side bonus pool not read"
 
 
+def test_decisive_settlement_recovers_when_winning_pool_has_zero_stakers():
+    contract = _contract_class()
+    side_fn = next(n for n in contract.body if isinstance(n, ast.FunctionDef) and n.name == "settle_claim_sides")
+    side_src = ast.unparse(side_fn)
+    assert "_winning_side" in side_src
+    assert "winning_total == 0" in side_src
+    assert "fee = 0" in side_src
+    assert "BPS_DENOMINATOR" in side_src
+
+    evidence_fn = next(n for n in contract.body if isinstance(n, ast.FunctionDef) and n.name == "settle_claim_evidence")
+    evidence_src = ast.unparse(evidence_fn)
+    assert "winning_total == 0" in evidence_src
+    assert "total_pool = 0" in evidence_src
+    assert "accrued_treasury_wei" in evidence_src
+
+
+def test_final_verdict_requires_validator_agreed_summary_substance():
+    contract = _contract_class()
+    fn = next(n for n in contract.body if isinstance(n, ast.FunctionDef) and n.name == "_claim_verdicts_agree")
+    src = ast.unparse(fn)
+    assert "_summary_substance_agrees" in src
+    assert "reasoning_summary" in src
+    helper = next(n for n in contract.body if isinstance(n, ast.FunctionDef) and n.name == "_summary_substance_agrees")
+    helper_src = ast.unparse(helper)
+    assert "leader_words" in helper_src and "validator_words" in helper_src
+    assert "return False" in helper_src
+
+
 def test_submit_evidence_accepts_not_yet_verifiable_claims():
     # Blocker #3: a NOT_YET_VERIFIABLE claim must be re-openable for new
     # evidence, not just described as such in a docstring.

@@ -1,6 +1,6 @@
 # PROMISE WAR backend (apps/api) deployment config — Fly.io.
 # Build context is the repo root since the API depends on workspace packages.
-app = "promise-war-api"
+app = "promise-war-api-george"
 primary_region = "iad"
 
 [build]

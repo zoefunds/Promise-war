@@ -48,13 +48,13 @@ vercel env rm NEXT_PUBLIC_CONTRACT_ADDRESS production --yes
 echo -n "0x..." | vercel env add NEXT_PUBLIC_CONTRACT_ADDRESS production
 
 # Fly.io (production backend)
-fly secrets set CONTRACT_ADDRESS="0x..." --app promise-war-api
+fly secrets set CONTRACT_ADDRESS="0x..." --app promise-war-api-george
 ```
 
 Then clear the cache (from repo root, with a local tunnel to the Fly Postgres instance):
 
 ```bash
-fly proxy 15432:5432 -a promise-war-db &
+fly proxy 15432:5432 -a promise-war-db-george &
 psql "postgres://promise_war_api:<password>@localhost:15432/promise_war_api?sslmode=disable" \
   -c "TRUNCATE TABLE activity_events, evidence, notifications, claims RESTART IDENTITY CASCADE;"
 ```
@@ -64,7 +64,7 @@ contract deployment.)
 
 Then redeploy both apps (see below) and re-verify with a live read:
 ```bash
-curl https://promise-war-api.fly.dev/api/v1/claims   # should be []
+curl https://promise-war-api-george.fly.dev/api/v1/claims   # should be [] after a fresh reset
 ```
 
 ## Frontend (Vercel)
@@ -90,7 +90,7 @@ Notes from this project's own deploy history, worth knowing before you hit them:
 ```bash
 cd apps/api
 pnpm build                                    # prisma generate + tsc, verify locally
-fly deploy --app promise-war-api --config ../../fly.toml
+fly deploy --app promise-war-api-george --config ../../fly.toml
 ```
 
 `fly.toml` sets `min_machines_running = 1` and `auto_stop_machines = false` — this is the
@@ -102,7 +102,7 @@ exhausting StudioNet's shared RPC quota during heavy testing).
 ### Database schema changes
 
 ```bash
-fly proxy 15432:5432 -a promise-war-db &
+fly proxy 15432:5432 -a promise-war-db-george &
 DATABASE_URL="postgres://promise_war_api:<password>@localhost:15432/promise_war_api?sslmode=disable" \
   npx prisma db push --schema ../../database/schema.prisma --accept-data-loss
 ```
