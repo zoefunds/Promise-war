@@ -1033,6 +1033,25 @@ Rules:
         if leader_flagged != validator_flagged:
             return False
 
+        # An evidence-level reasoning_summary is stored verbatim from
+        # whichever side's result `run_nondet_unsafe` keeps (the leader's,
+        # on agreement) and then flows — unmodified, unre-verified — into
+        # the final claim-verdict prompt as ground truth ("already
+        # adjudicated evidence"). Matching payout/slash/reward/flag buckets
+        # only proves the validator agrees with the leader's ECONOMIC
+        # classification; it says nothing about whether the validator
+        # independently produced the same substantive reasoning, so a
+        # leader could still pair a correct outcome tag with a fabricated
+        # or manipulated summary that later drives claim-level settlement
+        # unchecked. Require the same independent-substance-overlap check
+        # used at the claim-verdict level before this evidence item's
+        # summary is allowed to settle anything.
+        if not self._summary_substance_agrees(
+            str(leader_data.get("reasoning_summary", "")),
+            str(validator_data.get("reasoning_summary", "")),
+        ):
+            return False
+
         # The economically-meaningful field is the slash percentage. Agree
         # if leader and validator land within one tier-step of each other —
         # this tolerates ordinary phrasing variance on a borderline case

@@ -1,7 +1,7 @@
 # The Intelligent Contract
 
 `contracts/promise_war_contract.py` — 2,188 lines, 45 public methods (15 views, 30 writes),
-deployed on GenLayer StudioNet at `0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902`.
+deployed on GenLayer StudioNet at `0xbF422C1e23E0f3B45cEC12F6Cb843daB383145C5`.
 
 ## Claim lifecycle (state machine)
 

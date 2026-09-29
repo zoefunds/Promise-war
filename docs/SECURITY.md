@@ -52,11 +52,15 @@ instead of reaching Prisma raw or falling through to a generic `500`.
   unilateral action, but the queue/execute calls themselves are still gated by one private
   key. Moving to an N-of-M multisig as the timelock's own controlling address is the
   planned next step, pending the owner naming signer addresses and a threshold.
-- **No CI-gated live-contract integration tests.** The 25 tests in `contracts/test/` are
-  static (AST-based) and property-based (pure-Python mirrors of the settlement math,
-  randomized). Real-transaction coverage exists — extensively, across four audit rounds,
-  with real multi-account settlements — but as manually-run test campaigns logged in
-  `MEMORY.md`, not as an automated CI gate. Building genuine CI-gated coverage needs either
+- **No CI-gated live-contract integration tests.** The 32 tests in `contracts/test/` are
+  static (AST-based), property-based (pure-Python mirrors of the settlement math,
+  randomized), and — since round 6 — real execution against actual bound contract methods
+  via a minimal `genlayer` import stub (`test_contract_execution.py` /
+  `_genlayer_stub.py`), but none of the three runs against the actual deployed bytecode in
+  CI. Real-transaction coverage exists — extensively, across six audit rounds, with real
+  multi-account settlements — but as manually-run test campaigns logged in `MEMORY.md` and
+  `docs/E2E_TESTS.md`, not as an automated CI gate. Building genuine CI-gated coverage needs
+  either
   a funded StudioNet test-wallet secret in CI or a localnet GenVM node in the runner.
 - **No external professional audit.** Everything in this document reflects iterative
   adversarial review during development, not a formal third-party smart-contract security

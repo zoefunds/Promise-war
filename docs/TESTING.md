@@ -13,19 +13,21 @@ python3 -m pytest contracts/test/ -v
 genvm-lint check contracts/promise_war_contract.py
 ```
 
-- **`test_promise_war_static.py`** (18 tests) — parses the contract's AST and asserts on
+- **`test_promise_war_static.py`** (20 tests) — parses the contract's AST and asserts on
   structure directly: exactly one contract class, every public method's parameter/return
   types are schema-safe primitives (`str`/`bool`/`int`/`None`/`u256` — never a dataclass,
   dict, or list), every `TreeMap`/`DynArray`-typed storage field is left to GenVM's own
   zero-initialization (never assigned a fresh empty collection in `__init__`, a known GenVM
   footgun), exactly one `emit_transfer(` call exists in the whole file (the single money
-  choke point), plus a dedicated regression test for every fix from all four audit rounds
+  choke point), plus a dedicated regression test for every fix from all six audit rounds
   (dust accounting present, slash pool no longer double-credited to treasury,
   `NOT_YET_VERIFIABLE` reopening, HTTPS/host blocklist, cancel_claim's third-party guard,
   the terminal-verdict gate on `settle_claim_evidence`, the timelock's presence + replay
-  protection, the economic-snapshot fields, the zero-staker recipient invariant, and the
-  validator-agreed substantive-summary requirement).
-- **`test_settlement_math_properties.py`** (7 tests) — a faithful pure-Python mirror of
+  protection, the economic-snapshot fields, the zero-staker recipient invariant, the
+  claim-level validator-agreed substantive-summary requirement, and — new in round 6 — that
+  `_evidence_outcomes_agree()` itself *calls* `_summary_substance_agrees()`, not merely
+  mentions it).
+- **`test_settlement_math_properties.py`** (6 tests) — a faithful pure-Python mirror of
   the two settlement algorithms (`claim_side_payout`'s dust-absorption loop,
   `settle_claim_evidence`'s aggregate slash split), property-tested against 500 randomized
   trials each for: payout conservation (sum of payouts equals the pool exactly, for
@@ -34,10 +36,25 @@ genvm-lint check contracts/promise_war_contract.py
   total never varies), slash conservation (treasury + pool == total slash, exactly), and a
   direct model of the reopen/settle sequencing bug showing the exact amount the old
   (pre-fix) sequencing would have silently lost.
+- **`test_contract_execution.py`** (6 tests, new in round 6) — real execution against
+  actual bound `PromiseWar` methods, not AST inspection. `_genlayer_stub.py` installs a
+  minimal stand-in for the `genlayer` package (real `TreeMap`/`Address`/`u256`-style types,
+  identity decorators, no network/LLM access) so the contract module can actually be
+  `import`ed and run outside GenVM. Directly exercises: a real `settle_claim_sides()` +
+  `claim_side_payout()` call against a claim with a **positive** pool and a **zero-staker**
+  winning side (asserting the sole real staker receives the entire pool, fee waived); the
+  equivalent for `settle_claim_evidence()`'s slash-pool treasury fallback; and
+  `_evidence_outcomes_agree()` called directly with a fabricated/divergent validator summary
+  to prove it returns `False` even when the outcome tag matches the leader's (plus the
+  positive-agreement and outcome-mismatch controls). See `review2.md` for the regression
+  proof that these tests actually fail without the fix they guard.
 
-This is explicitly a mirror of the algorithm, not an execution of the real contract — it
-verifies the *math* is conservation-safe under adversarial inputs. Real-contract behavioral
-coverage instead comes from the manual live test campaigns described below.
+The static and property tests are explicitly a mirror of the algorithm/structure, not full
+GenVM execution; the execution tests close part of that gap for the pure-Python-reachable
+logic (settlement math, consensus agreement functions) but still can't exercise
+`gl.nondet.web`/`gl.nondet.exec_prompt` or GenVM's real storage layer. Real-contract
+behavioral coverage against the actual deployed bytecode instead comes from the manual live
+test campaigns described below and in `docs/E2E_TESTS.md`.
 
 ## Contract — live verification (manual, not yet CI-gated)
 
@@ -79,11 +96,12 @@ tests have covered:
   `slash_pool_share_bps_snapshot` were read back directly and confirmed to match the
   global config at creation time.
 
-The current focused run is `25 passed`. The live adjudication run returned
-`NOT_YET_VERIFIABLE` for two irrelevant sources, demonstrating that weak evidence does not
-force a decisive settlement. The live cancellation/refund and evidence-supersession runs
-also completed with finalized transactions. Every observed revert was a clean, deterministic
-`[EXPECTED]` `UserError`.
+The current focused run is `32 passed`. Round 6's live campaign (see `docs/E2E_TESTS.md`)
+reached a genuine `FULFILLED` decisive verdict and ran the full settlement chain
+(`settle_claim_evidence` → `settle_claim_sides` → `claim_side_payout` →
+`claim_evidence_payout` → `withdraw`) on the new deployment, in addition to the
+cancellation/refund and evidence-supersession scenarios also exercised this round. Every
+observed revert across every round was a clean, deterministic `[EXPECTED]` `UserError`.
 
 **Not yet built**: automating the above as a CI-gated suite. This needs either a funded
 StudioNet test-wallet secret available to CI, or a localnet GenVM node running inside the

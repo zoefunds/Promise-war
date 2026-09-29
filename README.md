@@ -20,7 +20,7 @@ a real claim.
 |---|---|
 | Frontend | [promise-war.vercel.app](https://promise-war.vercel.app) |
 | Backend API | [promise-war-api-george.fly.dev](https://promise-war-api-george.fly.dev) (`/api/v1/health`) |
-| Intelligent Contract | `0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902` (GenLayer StudioNet) |
+| Intelligent Contract | `0xbF422C1e23E0f3B45cEC12F6Cb843daB383145C5` (GenLayer StudioNet) |
 | Postgres | Fly Postgres, `promise-war-db-george` |
 
 The contract address above is the current deployment. Contracts are immutable, so fixes take
@@ -94,15 +94,23 @@ python3 -m pytest contracts/test/ -v
 genvm-lint check contracts/promise_war_contract.py
 ```
 
-25 tests: AST-based static regression tests (contract source can't be `import`ed and
-executed outside GenVM, so these parse and assert on the AST directly — see
-`contracts/test/test_promise_war_static.py`'s module docstring) plus 500-trial-each
-randomized property tests for payout conservation, claimant-ordering independence, and
-slash conservation (`contracts/test/test_settlement_math_properties.py`).
+32 tests across three files:
+- `contracts/test/test_promise_war_static.py` — AST-based static regression tests (the
+  contract's `from genlayer import *` can only resolve inside GenVM, so these parse and
+  assert on the AST directly rather than importing the module — see that file's module
+  docstring).
+- `contracts/test/test_settlement_math_properties.py` — 500-trial-each randomized property
+  tests for payout conservation, claimant-ordering independence, and slash conservation.
+- `contracts/test/test_contract_execution.py` — real execution against actual bound
+  `PromiseWar` methods (not just source inspection), using a minimal `genlayer` stub
+  (`contracts/test/_genlayer_stub.py`) so the module can be imported and run outside GenVM.
+  Covers the positive-pool/zero-staker settlement path and proves an unverified/fabricated
+  evidence summary cannot reach validator agreement even when its outcome tag matches — see
+  [`review2.md`](review2.md).
 
 ## Audit & fix history
 
-This contract went through four rounds of adversarial review during development. The current
+This contract went through six rounds of adversarial review during development. The current
 deployment includes the fixes listed below and is backed by local regression tests plus live
 StudioNet verification.
 
@@ -112,15 +120,17 @@ StudioNet verification.
 | 2 | 3,420 → fixed | `settle_claim_evidence()` could run while a claim was still `NOT_YET_VERIFIABLE` (reopenable), permanently losing later evidence's slash accounting |
 | 3 | 3,760 → fixed | Owner controls had no delay/notice mechanism before taking effect |
 | 4 | 3,920 → fixed | A claim's settlement read the *live* global fee/slash-share config instead of what was in effect when the claim was created — an owner could apply a fee increase retroactively to already-staked claims |
+| 5 | rejected, resubmitted | A decisive verdict could name a winning side with zero eligible stakers; a leader-authored claim-level summary could drive settlement without validator substance-checking |
+| 6 | fixed | Round 5's claim-level summary check was correct, but the evidence-level validator (`_evidence_outcomes_agree()`) never checked summary substance at all — see [`review2.md`](review2.md) |
 
 The current deployed source was fetched from StudioNet and checked for the settlement and
-verdict safeguards described in [`review.md`](review.md).
+verdict safeguards described in [`review.md`](review.md) and [`review2.md`](review2.md).
 
 **Live verification on the current deployment**: the contract above was redeployed after
-the latest fixes, the Postgres cache was cleared, and three real StudioNet E2E scenarios were
-run with detailed claim, stake, evidence, supersession, adjudication, cancellation, refund,
-and withdrawal data. The adjudication scenario returned `NOT_YET_VERIFIABLE` for irrelevant
-evidence, so no unsafe settlement was forced.
+round 6's fix, the frontend/backend were rewired to the new address, and four real StudioNet
+E2E scenarios were run with detailed claim, stake, evidence, supersession, adjudication,
+cancellation, refund, and withdrawal data, covering every non-admin write method — see
+[`docs/E2E_TESTS.md`](docs/E2E_TESTS.md).
 
 **Open, not yet closed** (documented, not silently dropped):
 - DNS-rebinding / redirect-following SSRF on evidence fetch — genuinely lives inside

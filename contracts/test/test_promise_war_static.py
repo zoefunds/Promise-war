@@ -144,6 +144,23 @@ def test_final_verdict_requires_validator_agreed_summary_substance():
     assert "return False" in helper_src
 
 
+def test_evidence_level_validator_also_checks_summary_substance():
+    # Second-round follow-up finding: the claim-level verdict is built
+    # from each evidence item's STORED reasoning_summary, but that summary
+    # used to be accepted from the leader alone — _evidence_outcomes_agree
+    # only compared the outcome-derived payout/slash/reward/flag buckets,
+    # never the summary text itself. Verify the evidence-level validator
+    # now runs the same independent-substance check before an item's
+    # summary is allowed to settle anything downstream.
+    contract = _contract_class()
+    fn = next(n for n in contract.body if isinstance(n, ast.FunctionDef) and n.name == "_evidence_outcomes_agree")
+    src = ast.unparse(fn)
+    assert "_summary_substance_agrees" in src
+    assert "reasoning_summary" in src
+    require_calls = [ast.unparse(n) for n in ast.walk(fn) if isinstance(n, ast.Call) and ast.unparse(n.func) == "self._summary_substance_agrees"]
+    assert require_calls, "_evidence_outcomes_agree must call _summary_substance_agrees, not just mention it"
+
+
 def test_submit_evidence_accepts_not_yet_verifiable_claims():
     # Blocker #3: a NOT_YET_VERIFIABLE claim must be re-openable for new
     # evidence, not just described as such in a docstring.
