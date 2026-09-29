@@ -6,9 +6,11 @@ This review records the fixes requested by the team, the implementation that is 
 and the evidence used to verify it. It supersedes the 2026-09-28 revision, which the team
 correctly rejected as incomplete: it closed the claim-level summary gap but left the
 evidence-level one open, and its regression tests only checked source structure instead of
-exercising the actual code paths. The active deployment is the GenLayer StudioNet contract
-at `0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902` (redeploy pending for this revision — see
-"Current production wiring").
+exercising the actual code paths. **This is a historical record of that round's fixes and
+verification, kept as-is** — the contract address below (`0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902`)
+is what was live at the time this document was written. The evidence-level gap it left open
+has since been fixed and redeployed; see [`review2.md`](review2.md) for that fix and the
+current live contract address (`0xbF422C1e23E0f3B45cEC12F6Cb843daB383145C5`).
 
 ## Scope of the requested fixes
 
@@ -152,16 +154,18 @@ require manufacturing a terminal state specifically to bypass the normal eligibi
 It is now covered by real execution in `test_contract_execution.py` (see above) rather than
 only by source-structure checks.
 
-## Current production wiring
+## Production wiring at the time of this revision (superseded — see review2.md)
 
 - Frontend: <https://promise-war.vercel.app>
 - Backend: <https://promise-war-api-george.fly.dev>
 - Database: `promise-war-db-george`
-- Contract: `0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902` — **pending redeploy** to pick up
-  the evidence-level `_summary_substance_agrees()` check in this revision. Until redeployed,
-  the live contract still has the gap described above.
+- Contract: `0xeE22D6623d86eFc23b1BFaDBDeB57ddF34076902` — this was the live contract when
+  this document was written. **It has since been superseded.** The evidence-level
+  `_summary_substance_agrees()` gap this revision left open is fixed in
+  [`review2.md`](review2.md), which was redeployed to `0xbF422C1e23E0f3B45cEC12F6Cb843daB383145C5`
+  — that is the current live contract address, wired into the same frontend/backend above.
 
-The previous contract's engagement cache was cleared before live testing. The backend and
-frontend use the current contract address, and the frontend successfully displays the live
-claim and adjudication state.
+The previous contract's engagement cache was cleared before live testing described in this
+document. The frontend/backend above now point at the current contract address from
+`review2.md`, not the one named in this historical section.
 
